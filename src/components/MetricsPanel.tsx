@@ -62,7 +62,7 @@ const MetricsPanel: React.FC<MetricsPanelProps> = ({ componentData, visibleMetri
             <div key={componentId} className="bg-gray-800 rounded-lg p-3">
               <h3 className="text-sm font-semibold capitalize mb-2 flex items-center">
                 <div className={`w-2 h-2 rounded-full mr-2 ${
-                  data.status === 'operational' ? 'bg-green-500' : 
+                  data.status === 'operational' || data.status === 'running' ? 'bg-green-500' : 
                   data.status === 'stopped' ? 'bg-red-500' : 'bg-yellow-500'
                 }`} />
                 {componentLabels[componentId]}
@@ -77,7 +77,7 @@ const MetricsPanel: React.FC<MetricsPanelProps> = ({ componentData, visibleMetri
                       </div>
                       <div className={`${
                         key === 'status' ? (
-                          value === 'operational' ? 'text-green-500' : 
+                          value === 'operational' || value === 'running' ? 'text-green-500' : 
                           value === 'stopped' ? 'text-red-500' : 'text-yellow-500'
                         ) : ''
                       }`}>

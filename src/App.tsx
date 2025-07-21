@@ -19,6 +19,7 @@ import '@babylonjs/loaders/glTF';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import MetricsPanel from './components/MetricsPanel';
 import ConfigPanel from './components/ConfigPanel';
+import { HistoricalCharts } from './components/HistoricalCharts';
 import './App.css';
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
   const sceneRef = useRef<Scene | null>(null);
   const [modelLoaded, setModelLoaded] = useState<boolean>(false);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [selectedComponentForHistory, setSelectedComponentForHistory] = useState<string | null>(null);
 
   // Scene setup effect
   useEffect(() => {
@@ -300,7 +302,7 @@ function App() {
       {/* Left Column */}
       <div className="w-1/4 flex flex-col border-r border-gray-800">
         {/* Line Efficiency Score */}
-        <div className="p-4 border-b border-gray-800 bg-gray-800">
+        <div className="p-4 border-b border-gray-800 bg-gray-900">
           <h2 className="text-xl font-bold mb-2">Line Efficiency Score</h2>
           <div className={`text-4xl font-bold ${
             lineEfficiency >= 0.8 ? 'text-green-500' :
@@ -308,6 +310,12 @@ function App() {
           }`}>
             {(lineEfficiency * 100).toFixed(1)}%
           </div>
+          <button
+            onClick={() => setSelectedComponentForHistory(null)}
+            className="mt-2 text-sm text-blue-400 hover:text-blue-300"
+          >
+            View History
+          </button>
         </div>
 
         {/* Configuration Panel */}
@@ -315,6 +323,7 @@ function App() {
           <ConfigPanel 
             visibleMetrics={visibleMetrics} 
             onMetricsChange={setVisibleMetrics}
+            onViewHistory={setSelectedComponentForHistory}
           />
         </div>
       </div>
@@ -336,7 +345,15 @@ function App() {
           )}
           {hoveredMesh && (
             <div className="absolute top-4 right-4 bg-black bg-opacity-75 p-2 rounded">
-              <div className="font-bold mb-1">{hoveredMesh}</div>
+              <div className="flex justify-between items-center mb-1">
+                <div className="font-bold">{hoveredMesh}</div>
+                <button
+                  onClick={() => setSelectedComponentForHistory(hoveredMesh.toLowerCase())}
+                  className="text-sm text-blue-400 hover:text-blue-300 ml-4"
+                >
+                  History
+                </button>
+              </div>
               {componentData[hoveredMesh.toLowerCase()] && (
                 <div className="text-sm">
                   {Object.entries(componentData[hoveredMesh.toLowerCase()]).map(([key, value]) => (
@@ -359,6 +376,14 @@ function App() {
           />
         </div>
       </div>
+
+      {/* Historical Charts Modal */}
+      {selectedComponentForHistory !== null && (
+        <HistoricalCharts
+          selectedComponent={selectedComponentForHistory}
+          onClose={() => setSelectedComponentForHistory(null)}
+        />
+      )}
     </div>
   );
 }
