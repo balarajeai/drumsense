@@ -13,6 +13,7 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
   const engineRef = useRef<Engine | null>(null);
   const sceneRef = useRef<Scene | null>(null);
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [hoveredMesh, setHoveredMesh] = useState<string | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -62,13 +63,7 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
             new ExecuteCodeAction(
               ActionManager.OnPointerOverTrigger,
               () => {
-                if (mesh instanceof Mesh && mesh.material instanceof StandardMaterial) {
-                  // Apply yellow highlight on hover regardless of component state
-                  mesh.material.emissiveColor = new Color3(1, 1, 0); // Bright yellow
-                  mesh.material.specularColor = new Color3(1, 1, 0.3); // Yellowish specular
-                  mesh.material.useEmissiveAsIllumination = true;
-                  mesh.material.specularPower = 64; // More intense highlight
-                }
+                setHoveredMesh(mesh.name);
                 onMeshHover && onMeshHover(mesh.name);
               }
             )
@@ -78,22 +73,7 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
             new ExecuteCodeAction(
               ActionManager.OnPointerOutTrigger,
               () => {
-                if (mesh instanceof Mesh && mesh.material instanceof StandardMaterial) {
-                  const meshName = mesh.name.toLowerCase();
-                  const componentKey = Object.keys(componentData).find(key => 
-                    meshName.includes(key.toLowerCase())
-                  );
-                  
-                  // Reset to stopped state (red) or normal state
-                  if (componentKey && componentData[componentKey].status === 'stopped') {
-                    mesh.material.emissiveColor = new Color3(1, 0, 0);
-                    mesh.material.specularColor = mesh.material.diffuseColor.clone();
-                  } else {
-                    mesh.material.emissiveColor = new Color3(0, 0, 0);
-                    mesh.material.specularColor = mesh.material.diffuseColor.clone();
-                  }
-                  mesh.material.specularPower = 32; // Reset specular intensity
-                }
+                setHoveredMesh(null);
                 onMeshHover && onMeshHover(null);
               }
             )
@@ -187,6 +167,10 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
             mesh.material.emissiveColor = new Color3(1, 0, 0);
             mesh.material.diffuseColor = mesh.material.diffuseColor.clone();  // Preserve original color
             console.log(`${mesh.name} is STOPPED - Applied red overlay (StandardMaterial)`);
+          } else if (hoveredMesh === mesh.name) {
+            mesh.material.emissiveColor = new Color3(1, 1, 0);
+            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();  // Preserve original color
+            console.log(`${mesh.name} is HOVERED - Applied yellow overlay (StandardMaterial)`);
           } else {
             mesh.material.emissiveColor = new Color3(0, 0, 0);
           }
@@ -198,6 +182,9 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
             if (componentState.status === 'stopped') {
               material.emissiveColor = new Color3(1, 0, 0);
               console.log(`${mesh.name} is STOPPED - Applied red overlay (PBRMaterial)`);
+            } else if (hoveredMesh === mesh.name) {
+              material.emissiveColor = new Color3(1, 1, 0);
+              console.log(`${mesh.name} is HOVERED - Applied yellow overlay (PBRMaterial)`);
             } else {
               material.emissiveColor = new Color3(0, 0, 0);
             }
@@ -208,7 +195,7 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
         }
       }
     });
-  }, [componentData, modelLoaded]);
+  }, [componentData, modelLoaded, hoveredMesh]);
 
   return (
     <div className={`relative ${className}`}>

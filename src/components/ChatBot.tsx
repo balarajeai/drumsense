@@ -25,7 +25,7 @@ export default function ChatBot() {
   useEffect(() => {
     const handleMessage = (topic: string, message: any) => {
       const data = JSON.parse(message.toString());
-      setMetrics(prevMetrics => ({
+      setMetrics((prevMetrics: any) => ({
         ...prevMetrics,
         [topic]: data
       }));
