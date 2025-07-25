@@ -1,261 +1,82 @@
-import { useEffect, useState, useRef } from 'react';
-import {
-  Engine,
-  Scene,
-  Vector3,
-  Color3,
-  Color4,
-  Mesh,
-  AbstractMesh,
-  ArcRotateCamera,
-  ActionManager,
-  ExecuteCodeAction,
-  DirectionalLight,
-  HemisphericLight,
-  StandardMaterial,
-  Material
-} from '@babylonjs/core';
-import '@babylonjs/loaders/glTF';
-import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import { useState, useEffect } from 'react';
 import MetricsPanel from './components/MetricsPanel';
-import ConfigPanel from './components/ConfigPanel';
-import { HistoricalCharts } from './components/HistoricalCharts';
+import ChatBot from './components/ChatBot';
+import ThreeDViewer from './components/ThreeDViewer';
+import SideMenu from './components/SideMenu';
+import EfficiencyDonut from './components/EfficiencyDonut';
+import AddMetricDialog from './components/AddMetricDialog';
 import './App.css';
+
+const AVAILABLE_METRICS = [
+  'status',
+  'efficiency',
+  'speed',
+  'temperature',
+  'fill_level',
+  'error_rate',
+  'uptime',
+  'collected_count',
+  'pressure',
+  'vibration',
+  'power_consumption',
+  'maintenance_due',
+  'quality_score'
+] as const;
+
+type MetricType = typeof AVAILABLE_METRICS[number];
 
 function App() {
   const [componentData, setComponentData] = useState<{ [key: string]: any }>({});
-  const [visibleMetrics, setVisibleMetrics] = useState<Set<string>>(new Set(['status', 'efficiency', 'speed', 'temperature', 'collected_count']));
   const [hoveredMesh, setHoveredMesh] = useState<string | null>(null);
+  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [lineEfficiency, setLineEfficiency] = useState<number>(0);
-  const renderCanvas = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<Engine | null>(null);
-  const sceneRef = useRef<Scene | null>(null);
-  const [modelLoaded, setModelLoaded] = useState<boolean>(false);
-  const [modelError, setModelError] = useState<string | null>(null);
-  const [selectedComponentForHistory, setSelectedComponentForHistory] = useState<string | null>(null);
-
-  // Scene setup effect
-  useEffect(() => {
-    if (!renderCanvas.current) return;
-
-    const engine = new Engine(renderCanvas.current, true);
-    const scene = new Scene(engine);
-
-    engineRef.current = engine;
-    sceneRef.current = scene;
-
-    // Set scene background color
-    scene.clearColor = new Color4(0.1, 0.1, 0.2, 1);
-
-    // Camera setup
-    const camera = new ArcRotateCamera(
-      "camera",
-      -Math.PI / 2,
-      Math.PI / 3,
-      25,
-      Vector3.Zero(),
-      scene
-    );
-    camera.attachControl(renderCanvas.current, true);
-    camera.lowerRadiusLimit = 10;
-    camera.upperRadiusLimit = 50;
-    camera.setTarget(new Vector3(0, 2, 0));
-
-    // Create a brighter light
-    const light = new DirectionalLight("light", new Vector3(-1, -2, -1), scene);
-    light.intensity = 2.0;  // Increased intensity
-    const hemisphericLight = new HemisphericLight("hemiLight", new Vector3(0, 1, 0), scene);
-    hemisphericLight.intensity = 1.0;  // Increased ambient light
-
-    // Load the model
-    SceneLoader.ImportMesh(
-      "",
-      `${window.location.origin}/models/`,
-      "drumsense.glb",
-      scene,
-      (meshes) => {
-        console.log("Model loaded successfully. Meshes:", meshes.map(m => ({
-          name: m.name,
-          lowercaseName: m.name.toLowerCase(),
-          id: m.id,
-          hasParent: !!m.parent,
-          parentName: m.parent?.name
-        })));
-        
-        // Log available component data for debugging
-        console.log("Available component data:", componentData);
-        
-        setModelLoaded(true);
-        
-        // Scale and position the model
-        const rootMesh = meshes[0];
-        rootMesh.scaling = new Vector3(8.0, 8.0, 8.0);
-        rootMesh.position = new Vector3(0, 2, 0);
-
-        // Add hover effects
-        scene.meshes.forEach((mesh) => {
-          if (mesh.name.includes("__root__")) return;
-
-          mesh.actionManager = new ActionManager(scene);
-          
-          mesh.actionManager.registerAction(
-            new ExecuteCodeAction(
-              ActionManager.OnPointerOverTrigger,
-              () => setHoveredMesh(mesh.name)
-            )
-          );
-
-          mesh.actionManager.registerAction(
-            new ExecuteCodeAction(
-              ActionManager.OnPointerOutTrigger,
-              () => setHoveredMesh(null)
-            )
-          );
-        });
-
-        console.log("Available meshes:", meshes.map(m => m.name).join(", "));
-      },
-      (event) => {
-        console.log("Loading progress:", event);
-      },
-      (_, message) => {
-        console.error("Error loading model:", message);
-        setModelError(message);
-      }
-    );
-
-    // Only render the scene in the render loop
-    engine.runRenderLoop(() => {
-      scene.render();
-    });
-
-    return () => {
-      scene.dispose();
-      engine.dispose();
-    };
-  }, []); // Only run once on mount
-
-  // Separate effect for material updates
-  useEffect(() => {
-    if (!sceneRef.current || !modelLoaded) return;
-
-    // Debug log current component states
-    console.log("Component Data:", componentData);
-    console.log("Available meshes:", sceneRef.current.meshes.map(m => ({
-      name: m.name,
-      lowercaseName: m.name.toLowerCase()
-    })));
-
-  // Log stopped components for debugging
-  Object.entries(componentData).forEach(([name, data]) => {
-    if (data?.status === 'stopped') {
-      console.log("Found stopped component:", name, data);
-    }
-  });
-
-  // Update all mesh materials
-    sceneRef.current.meshes.forEach((mesh: AbstractMesh) => {
-      if (!(mesh instanceof Mesh) || mesh.name.includes("__root__")) return;
-
-      // Debug: Log all meshes being processed
-      console.log("Processing mesh:", {
-        name: mesh.name,
-        parent: mesh.parent?.name,
-        hasChildren: mesh.getChildren().length > 0
-      });
-
-      // Direct mapping of mesh names to component keys
-      const meshToComponent: { [key: string]: string } = {
-        'conveyor': 'conveyor',
-        'filler': 'filler',
-        'control': 'control',
-        'collector': 'collector'
-      };
-
-      // Get the mesh name in lowercase
-      const meshName = mesh.name.toLowerCase();
-      
-      // Check if this mesh is one of our monitored components
-      if (!meshToComponent[meshName] || !componentData[meshToComponent[meshName]]) {
-        console.log("Skipping mesh:", mesh.name, "- No matching component");
-        return;
-      }
-      
-      const matchingComponent = meshToComponent[meshName];
-
-      console.log("Found matching component:", {
-        meshName: mesh.name,
-        component: matchingComponent,
-        status: componentData[matchingComponent].status
-      });
-
-      const componentState = componentData[matchingComponent];
-
-      console.log(`Processing mesh ${mesh.name}:`, {
-        meshName: mesh.name,
-        componentStatus: componentState.status,
-        isHovered: hoveredMesh === mesh.name,
-        hasMaterial: !!mesh.material,
-        materialType: mesh.material ? mesh.material.constructor.name : 'none',
-        hasScene: !!sceneRef.current
-      });
-
-      console.log(`Comstate`, !!mesh.material );
-
-      if (mesh.material && sceneRef.current) {
-        console.log("Material details:", {
-          meshName: mesh.name,
-          materialType: mesh.material.constructor.name,
-          materialProperties: Object.keys(mesh.material)
-        });
-
-        // Create a clone of the material for this mesh if it doesn't already have one
-        if (!mesh.material.name.includes('_clone')) {
-          const clonedMaterial = mesh.material.clone(`${mesh.name}_material_clone`);
-          mesh.material = clonedMaterial;
-        }
-
-        // Only modify the material if the mesh is stopped or hovered
-        if (mesh.material instanceof StandardMaterial) {
-          if (componentState.status === 'stopped') {
-            mesh.material.emissiveColor = new Color3(1, 0, 0);
-            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();  // Preserve original color
-            console.log(`${mesh.name} is STOPPED - Applied red overlay (StandardMaterial)`);
-          } else if (hoveredMesh === mesh.name) {
-            mesh.material.emissiveColor = new Color3(1, 1, 0);
-            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();  // Preserve original color
-            console.log(`${mesh.name} is HOVERED - Applied yellow overlay (StandardMaterial)`);
-          } else {
-            mesh.material.emissiveColor = new Color3(0, 0, 0);
-          }
-          mesh.material.useEmissiveAsIllumination = true;
-        } else {
-          // Handle PBRMaterial or other material types
-          const material = mesh.material as any;
-          if ('emissiveColor' in material) {
-            if (componentState.status === 'stopped') {
-              material.emissiveColor = new Color3(1, 0, 0);
-              console.log(`${mesh.name} is STOPPED - Applied red overlay (PBRMaterial)`);
-            } else if (hoveredMesh === mesh.name) {
-              material.emissiveColor = new Color3(1, 1, 0);
-              console.log(`${mesh.name} is HOVERED - Applied yellow overlay (PBRMaterial)`);
-            } else {
-              material.emissiveColor = new Color3(0, 0, 0);
-            }
-            if ('useEmissiveAsIllumination' in material) {
-              material.useEmissiveAsIllumination = true;
-            }
-          }
-        }
-      }
-    });
-  }, [componentData, hoveredMesh, modelLoaded]);
+  const [showAddMetric, setShowAddMetric] = useState(false);
+  const [visibleMetrics, setVisibleMetrics] = useState<Set<string>>(new Set([
+    'status',
+    'efficiency',
+    'speed',
+    'temperature',
+    'fill_level',
+    'error_rate',
+    'uptime',
+    'collected_count'
+  ]));
 
   // Fetch component data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:5000/status');
+        const response = await fetch('http://localhost:5050/status');
+        const data = await response.json();
+        const { line_efficiency, ...components } = data;
+        
+        // Ensure speed values are always positive
+        const processedComponents = Object.fromEntries(
+          Object.entries(components).map(([key, value]: [string, any]) => {
+            if (value && typeof value === 'object' && 'speed' in value) {
+              return [key, { ...value, speed: Math.abs(value.speed) }];
+            }
+            return [key, value];
+          })
+        );
+        
+        setComponentData(processedComponents);
+        setLineEfficiency(line_efficiency || 0);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch component data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('http://localhost:5050/status');
         const data = await response.json();
         const { line_efficiency, ...components } = data;
         
@@ -299,89 +120,124 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      {/* Left Column */}
-      <div className="w-1/4 flex flex-col border-r border-gray-800">
-        {/* Line Efficiency Score */}
-        <div className="p-4 border-b border-gray-800 bg-gray-900">
-          <h2 className="text-xl font-bold mb-2">Line Efficiency Score</h2>
-          <div className={`text-4xl font-bold ${
-            lineEfficiency >= 0.8 ? 'text-green-500' :
-            lineEfficiency >= 0.6 ? 'text-yellow-500' : 'text-red-500'
-          }`}>
-            {(lineEfficiency * 100).toFixed(1)}%
+      {/* Left Section - Efficiency Score and Metrics Control */}
+      <div className="w-1/6 border-r border-gray-700 bg-gray-800/50 backdrop-blur-sm p-4 flex flex-col gap-4">
+        {/* Efficiency Donut */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Production Efficiency</h2>
+          <div className="flex flex-col items-center bg-gray-800 rounded-lg p-6 shadow-lg border border-gray-700">
+            <EfficiencyDonut efficiency={lineEfficiency} />
+            <p className="text-sm text-gray-400 mt-4 font-medium">Overall Line Efficiency</p>
           </div>
-          <button
-            onClick={() => setSelectedComponentForHistory(null)}
-            className="mt-2 text-sm text-blue-400 hover:text-blue-300"
-          >
-            View History
-          </button>
         </div>
 
-        {/* Configuration Panel */}
-        <div className="flex-1 overflow-y-auto">
-          <ConfigPanel 
-            visibleMetrics={visibleMetrics} 
-            onMetricsChange={setVisibleMetrics}
-            onViewHistory={setSelectedComponentForHistory}
-          />
+        {/* Metrics Control */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Metrics Control</h2>
+            <button
+              onClick={() => setShowAddMetric(true)}
+              className="text-xs text-gray-400 hover:text-white flex items-center gap-1 px-2 py-1 rounded border border-gray-600 hover:border-gray-500 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Add</span>
+            </button>
+          </div>
+          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <div className="space-y-2">
+              {AVAILABLE_METRICS.map((metric) => (
+                <label key={metric} className="flex items-center justify-between cursor-pointer group py-1">
+                  <span className="text-sm text-gray-400 capitalize group-hover:text-gray-300">{metric.replace(/_/g, ' ')}</span>
+                  <div className="relative inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={visibleMetrics.has(metric)}
+                      onChange={() => {
+                        const newVisibleMetrics = new Set(visibleMetrics);
+                        if (visibleMetrics.has(metric)) {
+                          newVisibleMetrics.delete(metric);
+                        } else {
+                          newVisibleMetrics.add(metric);
+                        }
+                        setVisibleMetrics(newVisibleMetrics);
+                      }}
+                      className="sr-only"
+                    />
+                    <div className={`w-10 h-6 rounded-full transition-colors ${
+                      visibleMetrics.has(metric) ? 'bg-blue-600' : 'bg-gray-600'
+                    }`}>
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform mt-1 ${
+                        visibleMetrics.has(metric) ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+          </div>
         </div>
       </div>
 
-      {/* Right Column */}
+      {/* Center Section */}
       <div className="flex-1 flex flex-col">
-        {/* 3D Scene */}
-        <div className="flex-1 relative bg-gray-800">
-          <canvas ref={renderCanvas} className="w-full h-full" />
-          {!modelLoaded && !modelError && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-xl">Loading 3D model...</div>
-            </div>
-          )}
-          {modelError && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-xl text-red-500">Failed to load 3D model: {modelError}</div>
-            </div>
-          )}
-          {hoveredMesh && (
-            <div className="absolute top-4 right-4 bg-black bg-opacity-75 p-2 rounded">
-              <div className="flex justify-between items-center mb-1">
-                <div className="font-bold">{hoveredMesh}</div>
-                <button
-                  onClick={() => setSelectedComponentForHistory(hoveredMesh.toLowerCase())}
-                  className="text-sm text-blue-400 hover:text-blue-300 ml-4"
-                >
-                  History
-                </button>
+        {/* 3D Viewer */}
+        <div className="flex-1 relative">
+          <ThreeDViewer 
+            className="w-full h-full" 
+            onMeshHover={setHoveredMesh}
+            componentData={componentData}
+          />
+          {hoveredMesh && componentData[hoveredMesh.toLowerCase()] && (
+            <div className="absolute top-4 right-4 bg-gray-900/80 backdrop-blur-sm p-4 rounded-lg border border-gray-700">
+              <h3 className="font-medium text-white mb-2">{hoveredMesh}</h3>
+              <div className="space-y-2">
+                {Object.entries(componentData[hoveredMesh.toLowerCase()]).map(([key, value]) => (
+                  <div key={key} className="flex justify-between gap-4">
+                    <span className="text-gray-400">{key}:</span>
+                    <span className="text-white">{formatMetricValue(key, value)}</span>
+                  </div>
+                ))}
               </div>
-              {componentData[hoveredMesh.toLowerCase()] && (
-                <div className="text-sm">
-                  {Object.entries(componentData[hoveredMesh.toLowerCase()]).map(([key, value]) => (
-                    <div key={key} className="grid grid-cols-2 gap-2">
-                      <span className="text-gray-400">{key}:</span>
-                      <span>{formatMetricValue(key, value)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
         </div>
 
         {/* Metrics Panel */}
-        <div className="h-1/3 bg-gray-900">
-          <MetricsPanel 
-            componentData={componentData} 
-            visibleMetrics={visibleMetrics}
-          />
+        <div className="h-2/5 p-4 bg-gray-900/50 backdrop-blur-sm border-t border-gray-700">
+          <h2 className="text-xl font-semibold mb-4">Component Metrics</h2>
+          <MetricsPanel componentData={componentData} visibleMetrics={visibleMetrics} />
         </div>
       </div>
 
-      {/* Historical Charts Modal */}
-      {selectedComponentForHistory !== null && (
-        <HistoricalCharts
-          selectedComponent={selectedComponentForHistory}
-          onClose={() => setSelectedComponentForHistory(null)}
+      {/* Right Section - Chat Interface */}
+      <div className="w-1/4 border-l border-gray-700">
+        <ChatBot />
+      </div>
+
+      {/* Side Menu */}
+      <SideMenu isOpen={isSideMenuOpen} onClose={() => setIsSideMenuOpen(false)} />
+
+      {/* Settings Toggle */}
+      <button
+        onClick={() => setIsSideMenuOpen(true)}
+        className="fixed bottom-4 left-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white w-8 h-8 flex items-center justify-center rounded-full shadow-lg transition-all cursor-pointer hover:scale-110 active:scale-95 hover:shadow-xl active:shadow-md"
+      >
+        <i className="ri-settings-3-line text-base transition-transform group-hover:rotate-45"></i>
+      </button>
+
+      {/* Add Metric Dialog */}
+      {showAddMetric && (
+        <AddMetricDialog
+          onClose={() => setShowAddMetric(false)}
+          onAdd={(metricId: string) => {
+            const newVisibleMetrics = new Set(visibleMetrics);
+            newVisibleMetrics.add(metricId);
+            setVisibleMetrics(newVisibleMetrics);
+          }}
+          existingMetrics={visibleMetrics}
         />
       )}
     </div>

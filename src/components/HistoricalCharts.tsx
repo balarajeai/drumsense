@@ -38,12 +38,12 @@ export const HistoricalCharts: React.FC<Props> = ({ selectedComponent, onClose }
     const fetchData = async () => {
       if (!selectedComponent) {
         // Fetch overall efficiency history
-        const response = await fetch('http://localhost:5000/efficiency/history');
+        const response = await fetch('http://localhost:5050/efficiency/history');
         const data = await response.json();
         setEfficiencyHistory(data);
       } else {
         // Fetch specific component history
-        const response = await fetch(`http://localhost:5000/history/${selectedComponent}`);
+        const response = await fetch(`http://localhost:5050/history/${selectedComponent}`);
         const data = await response.json();
         setComponentHistory(data);
       }
