@@ -60,12 +60,25 @@ const MetricsPanel: React.FC<MetricsPanelProps> = ({ componentData, visibleMetri
 
           return (
             <div key={componentId} className="bg-gray-800 rounded-lg p-3">
-              <h3 className="text-sm font-semibold capitalize mb-2 flex items-center">
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  data.status === 'operational' || data.status === 'running' ? 'bg-green-500' : 
-                  data.status === 'stopped' ? 'bg-red-500' : 'bg-yellow-500'
-                }`} />
-                {componentLabels[componentId]}
+              <h3 className="text-sm font-semibold capitalize mb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                      data.operational_status?.color === 'green' ? 'bg-green-500' : 
+                      data.operational_status?.color === 'red' ? 'bg-red-500' : 
+                      data.operational_status?.color === 'yellow' ? 'bg-yellow-500' : 'bg-gray-500'
+                    }`} />
+                    {componentLabels[componentId]}
+                  </div>
+                  {(componentId === 'filler' || componentId === 'conveyor') && (
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      data.state === 'running' ? 'bg-green-900 text-green-300' : 
+                      'bg-red-900 text-red-300'
+                    }`}>
+                      {data.state?.toUpperCase()}
+                    </span>
+                  )}
+                </div>
               </h3>
               <div className="grid grid-cols-2 gap-1 text-xs">
                 {Object.entries(data).map(([key, value]) => {
@@ -77,11 +90,13 @@ const MetricsPanel: React.FC<MetricsPanelProps> = ({ componentData, visibleMetri
                       </div>
                       <div className={`${
                         key === 'status' ? (
-                          value === 'operational' || value === 'running' ? 'text-green-500' : 
-                          value === 'stopped' ? 'text-red-500' : 'text-yellow-500'
+                          value === 'RUNNING' ? 'text-green-500' : 
+                          value === 'STOPPED' ? 'text-red-500' : 
+                          value === 'DEGRADED' ? 'text-yellow-500' :
+                          value === 'CRITICAL' ? 'text-red-500' : ''
                         ) : ''
                       }`}>
-                        {formatMetricValue(key, value)}
+                        {key === 'state' && typeof value === 'string' ? value.toUpperCase() : formatMetricValue(key, value)}
                       </div>
                     </React.Fragment>
                   );

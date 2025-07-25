@@ -117,12 +117,16 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
       }
     });
 
-    // Direct mapping of mesh names to component keys
+    // Direct mapping of mesh names to component keys (including variations)
     const meshToComponent: { [key: string]: string } = {
       'conveyor': 'conveyor',
+      'conveyorbelt': 'conveyor',
       'filler': 'filler',
+      'bottlefiller': 'filler',
       'control': 'control',
-      'collector': 'collector'
+      'controlpanel': 'control',
+      'collector': 'collector',
+      'bottlecollector': 'collector'
     };
 
     // Update all mesh materials
@@ -140,6 +144,14 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
       const meshName = mesh.name.toLowerCase();
       
       // Check if this mesh is one of our monitored components
+      console.log("Checking mesh:", {
+        meshName,
+        parentName: mesh.parent?.name,
+        availableComponents: Object.keys(componentData),
+        matchFound: meshToComponent[meshName],
+        componentData: componentData[meshToComponent[meshName]]
+      });
+      
       if (!meshToComponent[meshName] || !componentData[meshToComponent[meshName]]) {
         console.log("Skipping mesh:", mesh.name, "- No matching component");
         return;
@@ -163,23 +175,44 @@ export default function ThreeDViewer({ className = '', onMeshHover, componentDat
 
         // Only modify the material if the mesh is stopped or hovered
         if (mesh.material instanceof StandardMaterial) {
-          if (componentState.status === 'stopped') {
+          // Convert status to uppercase for consistent comparison
+          const status = (componentState.status || '').toUpperCase();
+          const state = (componentState.state || '').toUpperCase();
+          
+          console.log(`Updating material for ${mesh.name}:`, { status, state });
+          
+          if (state === 'STOPPED' || status === 'STOPPED') {
             mesh.material.emissiveColor = new Color3(1, 0, 0);
-            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();  // Preserve original color
-            console.log(`${mesh.name} is STOPPED - Applied red overlay (StandardMaterial)`);
+            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();
+            mesh.material.specularColor = new Color3(0.1, 0.1, 0.1);  // Reduce specularity
+            console.log(`${mesh.name} is STOPPED - Applied red overlay`);
+          } else if (status === 'CRITICAL') {
+            mesh.material.emissiveColor = new Color3(1, 0.2, 0);
+            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();
+            mesh.material.specularColor = new Color3(0.2, 0.2, 0.2);
+            console.log(`${mesh.name} is CRITICAL - Applied orange-red overlay`);
+          } else if (status === 'DEGRADED') {
+            mesh.material.emissiveColor = new Color3(1, 0.8, 0);
+            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();
+            mesh.material.specularColor = new Color3(0.3, 0.3, 0.3);
+            console.log(`${mesh.name} is DEGRADED - Applied yellow overlay`);
           } else if (hoveredMesh === mesh.name) {
-            mesh.material.emissiveColor = new Color3(1, 1, 0);
-            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();  // Preserve original color
-            console.log(`${mesh.name} is HOVERED - Applied yellow overlay (StandardMaterial)`);
+            mesh.material.emissiveColor = new Color3(0.5, 1, 0.5);
+            mesh.material.diffuseColor = mesh.material.diffuseColor.clone();
+            mesh.material.specularColor = new Color3(0.4, 0.4, 0.4);
+            console.log(`${mesh.name} is HOVERED - Applied light green overlay`);
           } else {
             mesh.material.emissiveColor = new Color3(0, 0, 0);
+            mesh.material.specularColor = new Color3(0.5, 0.5, 0.5);
+            console.log(`${mesh.name} returned to normal state`);
           }
           mesh.material.useEmissiveAsIllumination = true;
         } else {
           // Handle PBRMaterial or other material types
           const material = mesh.material as any;
+          console.log("componentState.status:", componentState.status);
           if ('emissiveColor' in material) {
-            if (componentState.status === 'stopped') {
+            if (componentState.status === 'STOPPED') {
               material.emissiveColor = new Color3(1, 0, 0);
               console.log(`${mesh.name} is STOPPED - Applied red overlay (PBRMaterial)`);
             } else if (hoveredMesh === mesh.name) {
