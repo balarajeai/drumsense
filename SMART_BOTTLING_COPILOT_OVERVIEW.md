@@ -1,4 +1,4 @@
-# Smart Bottling Line Copilot: System Overview
+# Smart Bottling Line: System Overview
 
 A “Smart Bottling Line Copilot” is a plug-and-play AI + sensor system designed to optimize factory operations and empower non-technical users with actionable insights. Key features include:
 
